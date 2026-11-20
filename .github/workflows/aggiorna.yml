@@ -28,13 +28,16 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: impara-investire-github
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: robot/requirements.txt
+          cache-dependency-path: impara-investire-github/robot/requirements.txt
       - run: pip install -r robot/requirements.txt
       - name: Prepara la cartella del sito
         run: |
@@ -57,6 +60,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: impara-investire-github/_site
       - id: deploy
         uses: actions/deploy-pages@v4
