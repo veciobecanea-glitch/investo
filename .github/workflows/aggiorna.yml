@@ -60,4 +60,3 @@ jobs:
           path: _site
       - id: deploy
         uses: actions/deploy-pages@v4
-        
