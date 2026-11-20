@@ -56,7 +56,8 @@ jobs:
           git config user.name "robot-prezzi"
           git config user.email "robot@users.noreply.github.com"
           git add data/
-          git diff --cached --quiet || (git commit -m "Robot: aggiorna simboli ed eventi" && git push)
+          git diff --cached --quiet || git commit -m "Robot: aggiorna simboli ed eventi"
+          for i in 1 2 3; do git pull --rebase -X theirs origin main && git push && break || sleep 5; done || echo "salvataggio rimandato al prossimo giro"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
