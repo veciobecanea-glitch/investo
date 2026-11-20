@@ -1,0 +1,211 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Guida · Impara a Investire</title>
+<style>body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;max-width:760px;margin:0 auto;padding:24px 18px 60px;line-height:1.6;color:#2B2A26;background:#F7F4EC}
+h1{color:#1F6B4A;line-height:1.2}h2{color:#1F6B4A;margin-top:34px;border-top:1px solid #E2DCCB;padding-top:18px}h3{margin-top:22px}
+code{background:#EFE8D8;padding:1px 6px;border-radius:5px;font-size:.92em;word-break:break-all}blockquote{margin:14px 0;padding:10px 14px;background:#E8F1EA;border-left:4px solid #1F6B4A;border-radius:6px}
+blockquote p{margin:0}table{border-collapse:collapse;width:100%;font-size:.95em}td,th{border:1px solid #E2DCCB;padding:8px;vertical-align:top;text-align:left}th{background:#EFE8D8}
+a{color:#1F6B4A}hr{border:none}.top{display:inline-block;margin-bottom:10px}</style></head><body><a class="top" href="index.html">← Torna all'app</a><h1>Guida: mettere online «Impara a Investire» gratis</h1>
+<p>Alla fine avrai la tua app su un indirizzo tipo <strong>https://tuonome.github.io/impara-investire/</strong>, con:</p>
+<ul>
+<li>prezzi veri;</li>
+<li>sincronizzazione tra PC e telefono;</li>
+<li>notifiche;</li>
+<li>analizzatore di notizie.</li>
+</ul>
+<p><strong>Tutto gratis, senza carta di credito.</strong></p>
+<p>Tempo: circa <strong>30-40 minuti</strong> la prima volta. Ti consiglio di farlo dal <strong>computer</strong>.</p>
+<blockquote>
+<p>💡 Se qualcosa non va come descritto, niente panico: le schermate di questi siti cambiano un po' nel tempo. Cerca il pulsante con un nome simile.</p>
+</blockquote>
+<hr />
+<h2>Prima di iniziare: salva i tuoi dati</h2>
+<p>Se hai già usato l'app dentro Claude, prima di tutto salva i tuoi dati:</p>
+<ol>
+<li>Apri l'app su Claude.</li>
+<li>Vai in <strong>⚙️ Impostazioni → 💾 Backup dei dati → 📤 Esporta</strong>.</li>
+<li>Salva il file (oppure copia il testo in una nota).</li>
+</ol>
+<p>Lo reimporterai alla fine (passo 9).</p>
+<hr />
+<h2>Passo 1 — Crea l'account GitHub (2 minuti)</h2>
+<ol>
+<li>Vai su <strong>github.com</strong> e premi <strong>Sign up</strong>.</li>
+<li>Inserisci email, password e un nome utente.</li>
+<li>Il nome utente finirà nell'indirizzo del sito, per esempio <code>mario-rossi</code> diventa <code>mario-rossi.github.io</code>.</li>
+<li>Conferma l'email.</li>
+</ol>
+<hr />
+<h2>Passo 2 — Crea il progetto e carica i file (5 minuti)</h2>
+<ol>
+<li>Estrai lo zip che ti ho dato in una cartella del computer.</li>
+<li>Su GitHub, in alto a destra premi <strong>+ → New repository</strong>.</li>
+<li>Nome: <strong>impara-investire</strong>.</li>
+<li>Seleziona <strong>Public</strong>: serve per avere il sito gratis.</li>
+<li>I tuoi dati personali <strong>non</strong> finiscono qui.</li>
+<li>Premi <strong>Create repository</strong>.</li>
+<li>Nella pagina che si apre premi il link <strong>uploading an existing file</strong>.</li>
+<li>Trascina <strong>tutti</strong> i file e le cartelle dello zip:</li>
+<li><code>index.html</code>, <code>guida.html</code>, <code>config.json</code>, <code>catalog.json</code>, <code>manifest.webmanifest</code>, <code>sw.js</code>, le icone;</li>
+<li>le cartelle <code>robot</code>, <code>data</code>, <code>cloudflare</code>.</li>
+<li>In basso premi <strong>Commit changes</strong>.</li>
+</ol>
+<h3>⚠️ La cartella nascosta <code>.github</code></h3>
+<p>La cartella <code>.github</code> contiene il "robot". Su Mac e Windows è spesso <strong>nascosta</strong> e il trascinamento potrebbe saltarla.</p>
+<p>Per controllare se c'è, guarda se nel progetto su GitHub compare <code>.github</code>. Se non c'è, creala a mano:</p>
+<ol>
+<li>Premi <strong>Add file → Create new file</strong>.</li>
+<li>Come nome scrivi esattamente: <code>.github/workflows/aggiorna.yml</code></li>
+<li>Quando scrivi la <code>/</code>, GitHub crea le cartelle da solo.</li>
+<li>Apri il file <code>aggiorna.yml</code> dello zip (si trova in <code>.github/workflows/</code>) con il Blocco note.</li>
+<li>Su Mac premi Cmd+Shift+. per vedere i file nascosti.</li>
+<li>Copia tutto il testo e incollalo su GitHub.</li>
+<li>Premi <strong>Commit changes</strong>.</li>
+</ol>
+<hr />
+<h2>Passo 3 — Accendi il sito e il robot (3 minuti)</h2>
+<p>Nel tuo progetto su GitHub:</p>
+<ol>
+<li><strong>Settings → Pages</strong>: alla voce <strong>Source</strong> scegli <strong>GitHub Actions</strong>.</li>
+<li><strong>Settings → Actions → General</strong>:</li>
+<li>controlla che le Actions siano permesse ("Allow all actions");</li>
+<li>in fondo, alla voce <strong>Workflow permissions</strong>, scegli <strong>Read and write permissions</strong> e premi <strong>Save</strong>.</li>
+<li>Vai nella scheda <strong>Actions</strong> del progetto.</li>
+<li>Se compare un pulsante verde tipo "I understand my workflows, go ahead and enable them", premilo.</li>
+<li>A sinistra scegli <strong>Aggiorna prezzi e sito</strong>, poi a destra <strong>Run workflow → Run workflow</strong>.</li>
+</ol>
+<p>La prima volta il robot impiega <strong>15-30 minuti</strong>, perché deve cercare i codici di migliaia di titoli. Quando compare il pallino verde ✅, la tua app è online su:</p>
+<p><strong>https://TUONOMEUTENTE.github.io/impara-investire/</strong></p>
+<p>Da quel momento il robot gira da solo <strong>ogni ora</strong>:
+- completa poco alla volta i codici che mancano;
+- aggiorna i prezzi;
+- ogni 6 ore aggiorna l'intero catalogo.</p>
+<hr />
+<h2>Passo 4 — Il ponte Cloudflare per i prezzi in tempo reale e le notizie (7 minuti)</h2>
+<ol>
+<li>Vai su <strong>dash.cloudflare.com/sign-up</strong> e crea un account gratuito.</li>
+<li>Nel menu a sinistra apri <strong>Workers &amp; Pages</strong> (a volte si trova sotto "Compute"), poi premi <strong>Create → Create Worker</strong>.</li>
+<li>Dai un nome, per esempio <strong>impara-ponte</strong>, e premi <strong>Deploy</strong>.</li>
+<li>Premi <strong>Edit code</strong>. Cancella tutto il codice di esempio e incolla tutto il contenuto del file <code>cloudflare/worker.js</code> dello zip. Premi <strong>Deploy</strong>.</li>
+<li>Copia l'indirizzo del worker, del tipo <code>https://impara-ponte.TUONOME.workers.dev</code>.</li>
+<li>Per provarlo, apri nel browser: <code>https://impara-ponte.TUONOME.workers.dev/tg?isin=IE00BK5BQT80</code></li>
+<li>Se vedi dei numeri (il prezzo di VWCE), funziona ✅.</li>
+<li>Torna su GitHub, apri il file <strong>config.json</strong> e premi la matita ✏️ per modificarlo.</li>
+<li>Nella riga <code>"worker": ""</code> incolla l'indirizzo tra le virgolette, così:
+     <code>"worker": "https://impara-ponte.TUONOME.workers.dev"</code></li>
+<li>Premi <strong>Commit changes</strong>. Il sito si aggiorna da solo in pochi minuti.</li>
+</ol>
+<p><strong>Facoltativo, per sicurezza:</strong> puoi fare in modo che il ponte funzioni solo con la tua app.
+1. In Cloudflare apri il worker → <strong>Settings → Variables and Secrets → Add</strong>.
+2. Nome: <code>ALLOWED_ORIGIN</code>. Valore: <code>https://TUONOMEUTENTE.github.io</code>
+3. Salva con <strong>Deploy</strong>.</p>
+<hr />
+<h2>Passo 5 — Installa l'app sul telefono (1 minuto)</h2>
+<ul>
+<li><strong>Android (Chrome):</strong> apri il tuo indirizzo → menu ⋮ → <strong>Installa app</strong> (oppure "Aggiungi a schermata Home").</li>
+<li><strong>iPhone (Safari):</strong> apri il tuo indirizzo → pulsante <strong>Condividi</strong> □↑ → <strong>Aggiungi alla schermata Home</strong>.</li>
+</ul>
+<p>Avrai l'icona come una vera app. Lezioni, vocabolario e simulazione funzionano anche senza internet.</p>
+<hr />
+<h2>Passo 6 — Sincronizza PC e telefono (5 minuti)</h2>
+<p>Serve una "chiave" GitHub che possa solo salvare i tuoi dati in un file privato (Gist).</p>
+<ol>
+<li>Su GitHub, clicca la tua foto in alto a destra → <strong>Settings</strong>.</li>
+<li>In fondo a sinistra apri <strong>Developer settings → Personal access tokens → Tokens (classic)</strong>.</li>
+<li>Premi <strong>Generate new token → Generate new token (classic)</strong>. Compila così:</li>
+<li><strong>Note:</strong> <code>impara-investire</code></li>
+<li><strong>Expiration:</strong> scegli <strong>No expiration</strong> oppure 1 anno, e ricordati di rinnovarla.</li>
+<li>Spunta <strong>solo</strong> la casella <strong>gist</strong>, nient'altro.</li>
+<li>Premi <strong>Generate token</strong> e <strong>copia subito</strong> la chiave, che inizia con <code>ghp_</code>. GitHub non te la mostrerà più.</li>
+<li><strong>Sul primo dispositivo</strong> (per esempio il PC):</li>
+<li>apri l'app → ⚙️ Impostazioni → ☁️ Sincronizza PC e telefono;</li>
+<li>incolla la chiave e premi <strong>Primo dispositivo: crea</strong>;</li>
+<li>comparirà un <strong>codice di sincronizzazione</strong>: copialo.</li>
+<li><strong>Sul secondo dispositivo</strong> (per esempio il telefono):</li>
+<li>nelle stesse impostazioni incolla <strong>la stessa chiave</strong> e il <strong>codice</strong>;</li>
+<li>premi <strong>Altro dispositivo: collega</strong>.</li>
+</ol>
+<p>Da ora ogni modifica viene salvata su GitHub in pochi secondi e ritrovata sull'altro dispositivo quando lo apri.</p>
+<blockquote>
+<p>🔒 La chiave resta salvata solo nei tuoi dispositivi: non la scrivere mai nei file del progetto. Se la perdi o pensi che qualcuno l'abbia vista, cancellala su GitHub (stessa pagina dei token) e creane una nuova.</p>
+</blockquote>
+<hr />
+<h2>Passo 7 — Notifiche sul telefono anche ad app chiusa (5 minuti)</h2>
+<ol>
+<li>Installa l'app gratuita <strong>ntfy</strong> sul telefono (Play Store o App Store).</li>
+<li>Nella tua app: ⚙️ Impostazioni → 📲 Notifiche sul telefono → <strong>Crea il mio canale</strong>.</li>
+<li>Compare un nome tipo <code>impara-k3j9x2m1q8zz</code>.</li>
+<li>In ntfy premi <strong>+</strong> e iscriviti a quel nome, lasciando il server predefinito <code>ntfy.sh</code>.</li>
+<li>Nella tua app premi <strong>Invia notifica di prova</strong>: deve arrivarti sul telefono ✅.</li>
+</ol>
+<p>Così ricevi gli avvisi quando l'app è aperta. <strong>Per riceverli anche ad app chiusa</strong>, devi dare al robot l'accesso agli avvisi:</p>
+<ol>
+<li>Nel progetto su GitHub apri <strong>Settings → Secrets and variables → Actions → New repository secret</strong>.</li>
+<li>Crea il segreto <code>GIST_ID</code>: come valore metti il <strong>codice di sincronizzazione</strong> del passo 6.</li>
+<li>Crea il segreto <code>GIST_TOKEN</code>: come valore metti la <strong>chiave</strong> <code>ghp_…</code> del passo 6.</li>
+</ol>
+<p>Il robot ogni ora controlla i tuoi avvisi di prezzo e, se uno scatta, ti manda la notifica.</p>
+<blockquote>
+<p>Tieni segreto il nome del canale ntfy: chi lo conosce può leggere le tue notifiche.</p>
+</blockquote>
+<hr />
+<h2>Passo 8 — Riassunto delle notizie con l'IA (facoltativo, 2 minuti)</h2>
+<p>L'analizzatore di notizie funziona già senza IA. Per avere anche il pulsante <strong>✨ Spiegamelo semplice</strong>:</p>
+<ol>
+<li>Vai su <strong>aistudio.google.com</strong> con il tuo account Google → <strong>Get API key → Create API key</strong>.</li>
+<li>Copiala nell'app: ⚙️ Impostazioni → ✨ Riassunto notizie con l'IA → <strong>Salva</strong>.</li>
+</ol>
+<p>Il piano gratuito ha un limite di richieste al giorno, che Google cambia spesso: basta per qualche titolo al giorno.</p>
+<p>Se un giorno il riassunto smette di funzionare per "modello non trovato", in AI Studio guarda il nome di un modello "Flash" o "Flash-Lite" disponibile e scrivilo nel campo <strong>Modello</strong>.</p>
+<hr />
+<h2>Passo 9 — Riporta i tuoi dati</h2>
+<p>Nella nuova app: ⚙️ Impostazioni → 💾 Backup → <strong>📥 Importa</strong>. Scegli il file salvato all'inizio, oppure incolla il testo.</p>
+<hr />
+<h2>Cosa è vero e cosa è simulato</h2>
+<p>Sotto il prezzo di ogni titolo trovi un'etichetta:</p>
+<ul>
+<li><strong>✅ Prezzo vero · ora</strong>: prezzo reale. Le fonti sono:</li>
+<li><strong>Tradegate</strong> (Borsa di Berlino), in tempo reale per molti ETF, ETC e titoli europei;</li>
+<li><strong>Yahoo Finance</strong>: quasi in tempo reale per le azioni USA, circa 15-20 minuti di ritardo per le Borse europee;</li>
+<li><strong>CoinGecko</strong> per le crypto;</li>
+<li>l'<strong>aggiornamento orario</strong> del robot.</li>
+<li><strong>🎲 Simulato</strong>: per alcuni titoli piccoli il robot non trova il prezzo vero e l'app continua con la simulazione.</li>
+</ul>
+<p>Il prezzo di Tradegate può differire di qualche centesimo da quello di Borsa Italiana o della tua app.</p>
+<hr />
+<h2>Manutenzione e problemi comuni</h2>
+<table>
+<thead>
+<tr>
+<th>Problema</th>
+<th>Soluzione</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I prezzi non si aggiornano da giorni</td>
+<td>Scheda <strong>Actions</strong> del progetto: se il robot è in pausa premi <strong>Enable workflow</strong>; se c'è una ❌ apri l'esecuzione e leggi l'errore. Spesso è Yahoo temporaneamente bloccato: si risolve da solo.</td>
+</tr>
+<tr>
+<td>«Il ponte non risponde»</td>
+<td>Controlla l'indirizzo in <code>config.json</code> e in ⚙️ Impostazioni; prova il link di test del passo 4.</td>
+</tr>
+<tr>
+<td>La sincronizzazione non funziona</td>
+<td>La chiave potrebbe essere scaduta: creane una nuova (passo 6) e reinseriscila su ogni dispositivo e nel segreto <code>GIST_TOKEN</code>.</td>
+</tr>
+<tr>
+<td>Le notifiche non arrivano ad app chiusa</td>
+<td>Controlla i segreti <code>GIST_ID</code> e <code>GIST_TOKEN</code> (passo 7) e che nell'app ci sia il canale ntfy.</td>
+</tr>
+<tr>
+<td>Voglio aggiornare l'app con una nuova versione</td>
+<td>Carica il nuovo <code>index.html</code> su GitHub (Add file → Upload files): sostituisce il vecchio. I tuoi dati non si perdono.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Limiti dei servizi gratuiti</strong> (più che sufficienti per un uso personale):
+- Cloudflare Workers: 100.000 richieste al giorno.
+- GitHub Actions: gratis per i progetti pubblici.
+- CoinGecko: API pubblica con limiti al minuto.</p>
+<p><strong>Uso personale:</strong> i dati di Yahoo e Tradegate sono per uso personale. Non pubblicizzare il sito come servizio per altri.</p>
+<hr />
+<p><em>Regole fiscali e informazioni dell'app sono semplificate a scopo didattico: non sono consigli di investimento.</em></p></body></html>
