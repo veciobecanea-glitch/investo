@@ -1,66 +1,277 @@
-name: Aggiorna prezzi e sito
+"""Robot di Impara a Investire.
+Gira su GitHub Actions: scarica i prezzi veri (Yahoo Finance tramite yfinance),
+li converte in euro e prepara la cartella del sito con prices.json ed events.json.
+Se configurato, controlla gli avvisi di prezzo e manda le notifiche con ntfy.
+"""
+import json, os, re, sys, time, math, shutil, datetime as dt
+import urllib.request
+import yfinance as yf
 
-on:
-  schedule:
-    - cron: "17 * * * *"      # ogni ora, al minuto 17
-  workflow_dispatch:
-    inputs:
-      full:
-        description: "Aggiorna tutto il catalogo (più lento)"
-        type: boolean
-        default: true
-  push:
-    branches: [main]
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SITE = os.path.join(ROOT, "_site")
+DATA = os.path.join(ROOT, "data")
+NOW = time.time()
+HOUR = dt.datetime.now(dt.timezone.utc).hour
+FULL = os.environ.get("FULL") == "1" or HOUR % 6 == 0          # tutto il catalogo ogni 6 ore
+EVENTS = os.environ.get("EVENTS") == "1" or HOUR == 4           # calendario eventi una volta al giorno
+MAX_RESOLVE = int(os.environ.get("MAX_RESOLVE", "400"))          # nuovi simboli da cercare per esecuzione
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+def log(*a): print(*a, flush=True)
+def jload(p, d):
+    try:
+        with open(p, encoding="utf-8") as f: return json.load(f)
+    except Exception: return d
+def jsave(p, o, compact=False):
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(o, f, ensure_ascii=False, separators=(",", ":") if compact else None, indent=None if compact else 1)
 
-concurrency:
-  group: aggiorna
-  cancel-in-progress: false
+def http_json(url, data=None, headers=None, method=None):
+    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    with urllib.request.urlopen(req, timeout=30) as r: return json.loads(r.read().decode())
 
-jobs:
-  aggiorna:
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    defaults:
-      run:
-        working-directory: impara-investire-github
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: impara-investire-github/robot/requirements.txt
-      - run: pip install -r robot/requirements.txt
-      - name: Prepara la cartella del sito
-        run: |
-          mkdir -p _site data
-          for f in index.html guida.html manifest.webmanifest sw.js config.json icon-192.png icon-512.png; do if [ -f "$f" ]; then cp "$f" _site/; else echo "manca $f"; fi; done
-          curl -sfL "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/prices.json" -o _site/prices.json || echo "nessun prezzo precedente"
-      - name: Scarica i prezzi
-        env:
-          FULL: ${{ (github.event_name == 'workflow_dispatch' && inputs.full) && '1' || '' }}
-          MAX_RESOLVE: ${{ github.event_name == 'schedule' && '400' || '1500' }}
-          GIST_ID: ${{ secrets.GIST_ID }}
-          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-        run: python robot/update.py
-      - name: Salva la memoria del robot
-        run: |
-          git config user.name "robot-prezzi"
-          git config user.email "robot@users.noreply.github.com"
-          git add data/
-          git diff --cached --quiet || git commit -m "Robot: aggiorna simboli ed eventi"
-          for i in 1 2 3; do git pull --rebase -X theirs origin main && git push && break || sleep 5; done || echo "salvataggio rimandato al prossimo giro"
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: impara-investire-github/_site
-      - id: deploy
-        uses: actions/deploy-pages@v4
+# ---------------- materie prime: future su Yahoo e conversione nell'unità usata dall'app ----------------
+FUT = {"ORO": ("GC=F", 1), "ARG": ("SI=F", 1), "PLAT": ("PL=F", 1), "PALL": ("PA=F", 1), "BRENT": ("BZ=F", 1), "WTI": ("CL=F", 1),
+       "GAS": ("NG=F", 1), "RAME": ("HG=F", 2204.62), "ALLUM": ("ALI=F", 1), "GRANO": ("ZW=F", .01), "MAIS": ("ZC=F", .01),
+       "SOIA": ("ZS=F", .01), "CAFFE": ("KC=F", .01), "CACAO": ("CC=F", 1), "ZUCC": ("SB=F", .01), "COTONE": ("CT=F", .01),
+       "SUCCO": ("OJ=F", .01), "BESTIAME": ("LE=F", .01), "SUINI": ("HE=F", .01), "VITELLI": ("GF=F", .01), "AVENA": ("ZO=F", .01),
+       "RISO": ("ZR=F", 1), "LEGNAME": ("LBR=F", 1), "GASOLIO": ("HO=F", 1), "BENZINA": ("RB=F", 1), "OLIOSOIA": ("ZL=F", .01),
+       "FARSOIA": ("ZM=F", 1), "LATTE": ("DC=F", 1)}
+
+COUNTRY_SFX = [("Italia", ".MI"), ("Germania", ".DE"), ("Francia", ".PA"), ("Olanda", ".AS"), ("Paesi Bassi", ".AS"), ("Spagna", ".MC"),
+               ("Svizzera", ".SW"), ("Regno Unito", ".L"), ("Svezia", ".ST"), ("Danimarca", ".CO"), ("Norvegia", ".OL"),
+               ("Finlandia", ".HE"), ("Belgio", ".BR"), ("Irlanda", ".IR"), ("Portogallo", ".LS"), ("Austria", ".VI"), ("Giappone", ".T"),
+               ("Hong Kong", ".HK")]
+EU_SFX = [".MI", ".DE", ".PA", ".AS", ".MC", ".SW", ".L", ".ST", ".CO", ".OL", ".HE", ".BR", ".LS", ".VI"]
+
+def currency_of(sym):
+    if sym.endswith("=F"): return "USD"
+    m = re.search(r"\.([A-Z]{1,3})$", sym)
+    sfx = "." + m.group(1) if m else ""
+    return {".MI": "EUR", ".DE": "EUR", ".F": "EUR", ".SG": "EUR", ".MU": "EUR", ".BE": "EUR", ".DU": "EUR", ".HM": "EUR", ".HA": "EUR", ".VI": "EUR", ".PA": "EUR", ".AS": "EUR", ".MC": "EUR", ".BR": "EUR", ".LS": "EUR", ".HE": "EUR",
+            ".VI": "EUR", ".IR": "EUR", ".L": "GBp", ".SW": "CHF", ".ST": "SEK", ".CO": "DKK", ".OL": "NOK", ".T": "JPY", ".HK": "HKD"}.get(sfx, "USD")
+
+def candidates(a):
+    t, n, c, s, isin, p, gen, x = a
+    if c == "crypto" and not isin: return []
+    if t in FUT: return [FUT[t][0]]
+    if c == "materie" and not isin and gen: return []
+    if isin: return ["ISIN:" + isin]
+    m = re.match(r"^(.+)\.(US|MI|L|PA|DE|AS|ST|SW|MC|HK|T)$", t)
+    if m:
+        base, sf = m.group(1), m.group(2)
+        return [base.replace(".", "-")] if sf == "US" else [base + "." + sf]
+    if re.search(r"\.[A-Z]{1,2}$", t): return [t]            # già nel formato Yahoo (es. AIR.PA)
+    if c == "azioni":
+        if "USA" in s or "Canada" in s or x == 1: return [t.replace(".", "-")]
+        out = [t.replace(".", "-") + sfx for k, sfx in COUNTRY_SFX if k in s]
+        if "Europa" in s and not out: out = [t + sf for sf in EU_SFX]
+        return out if out else [t.replace(".", "-")]
+    # ETF o ETC senza ISIN (lista curata): borse europee in euro
+    return [t + ".MI", t + ".DE", t + ".AS", t + ".PA", t + ".L"]
+
+def isin_lookup(isin):
+    try:
+        qs = yf.Search(isin, max_results=10).quotes
+    except Exception as e:
+        log("search err", isin, e); return []
+    pref = {"MIL": 0, "GER": 1, "AMS": 2, "PAR": 3, "FRA": 4, "STU": 5, "MUN": 6, "BER": 7, "DUS": 8, "HAM": 9, "EBS": 10, "LSE": 11}
+    qs = [q for q in qs if q.get("symbol")]
+    qs.sort(key=lambda q: pref.get(q.get("exchange", ""), 50))
+    return [q["symbol"] for q in qs][:5]
+
+def fetch_last(symbols):
+    """Ultimo prezzo e chiusura precedente per una lista di simboli Yahoo."""
+    out = {}
+    symbols = list(dict.fromkeys(symbols))
+    for i in range(0, len(symbols), 250):
+        chunk = symbols[i:i + 250]
+        try:
+            df = yf.download(chunk, period="7d", interval="1d", group_by="ticker", threads=True, progress=False, auto_adjust=False)
+        except Exception as e:
+            log("download err", e); continue
+        for sym in chunk:
+            try:
+                col = df[sym]["Close"] if len(chunk) > 1 else df["Close"]
+                col = col.dropna()
+                if hasattr(col, "columns"): col = col.iloc[:, 0]
+                if len(col) == 0: continue
+                last = float(col.iloc[-1]); prev = float(col.iloc[-2]) if len(col) > 1 else last
+                if last > 0 and math.isfinite(last): out[sym] = (last, prev)
+            except Exception:
+                pass
+        time.sleep(1)
+    return out
+
+def get_fx():
+    pairs = {"USD": "EURUSD=X", "GBP": "EURGBP=X", "CHF": "EURCHF=X", "SEK": "EURSEK=X", "DKK": "EURDKK=X", "NOK": "EURNOK=X", "JPY": "EURJPY=X", "HKD": "EURHKD=X"}
+    q = fetch_last(list(pairs.values()))
+    fx = {"EUR": 1.0}
+    for k, s in pairs.items():
+        if s in q: fx[k] = q[s][0]
+    if "GBP" in fx: fx["GBp"] = fx["GBP"] * 100
+    return fx
+
+CUR_CACHE = {}
+def real_currency(sym):
+    """Valuta vera del titolo secondo Yahoo (es. ETF quotati a Londra in dollari)."""
+    if sym.endswith("=F"): return "USD"
+    if sym in CUR_CACHE: return CUR_CACHE[sym]
+    sfx = ("." + sym.rsplit(".", 1)[1]) if "." in sym else ""
+    if sfx not in (".L", ".SW", ".IL") and (sfx == "" or currency_of(sym) != "USD"):
+        return currency_of(sym)                     # borse con una sola valuta: non serve chiedere
+    cur = None
+    try: cur = yf.Ticker(sym).fast_info.get("currency")
+    except Exception: pass
+    if not cur:
+        try: cur = (yf.Ticker(sym).info or {}).get("currency")
+        except Exception: pass
+    CUR_CACHE[sym] = cur or currency_of(sym)
+    return CUR_CACHE[sym]
+
+def sym_cur(v):
+    """symbols.json salva 'SIMBOLO|VALUTA'."""
+    if "|" in v: s, c = v.split("|", 1); return s, c
+    return v, currency_of(v)
+
+def to_eur(v, cur, fx, factor=1.0):
+    r = fx.get(cur)
+    return None if not r else v * factor / r
+
+def main():
+    cat = jload(os.path.join(ROOT, "catalog.json"), [])
+    symmap = jload(os.path.join(DATA, "symbols.json"), {})        # t -> "SIMBOLO|VALUTA"
+    tried = jload(os.path.join(DATA, "tried.json"), {})            # t -> timestamp ultimo tentativo fallito
+    if symmap.get("_v") != 2:                                        # versione nuova: ricontrolla tutto con le valute vere
+        log("memoria vecchia: ricomincio la ricerca dei simboli"); symmap = {"_v": 2}; tried = {}
+    log(f"catalogo {len(cat)} · mappati {sum(1 for v in symmap.values() if v)} · completo={FULL}")
+    fx = get_fx(); log("cambi", fx)
+    if "USD" not in fx: log("Yahoo non risponde: esco senza aggiornare"); sys.exit(0)
+    byT = {a[0]: a for a in cat}
+    def plausible(a, pe):
+        ratio = pe / a[5] if a[5] else 1
+        if a[7] == 2: return 0.6 < ratio < 1.7          # ETF/ETC di Borsa Italiana: prezzo di partenza reale di agosto
+        if not a[6]: return 0.4 < ratio < 2.5           # titoli curati: prezzo indicativo
+        return True                                     # catalogo esteso: prezzo di partenza simulato
+
+    # 1) trova i simboli mancanti (un po' per volta)
+    todo = [a for a in cat if a[0] not in symmap and NOW - tried.get(a[0], 0) > 20 * 86400 and candidates(a)]
+    todo.sort(key=lambda a: (a[6], a[7] == 1))                     # prima i titoli curati, poi ETF/ETC, poi il catalogo esteso
+    todo = todo[:MAX_RESOLVE]
+    log("da risolvere", len(todo))
+    cand = {}
+    for a in todo:
+        cs = candidates(a)
+        if cs and cs[0].startswith("ISIN:"): cs = isin_lookup(cs[0][5:]); time.sleep(.3)
+        cand[a[0]] = cs
+    allc = [s for cs in cand.values() for s in cs]
+    q = fetch_last(allc) if allc else {}
+    for t, cs in cand.items():
+        a = byT[t]; ok = ""
+        for s in cs:
+            if s not in q: continue
+            fac = FUT[t][1] if t in FUT else 1
+            cur = real_currency(s)
+            pe = to_eur(q[s][0], cur, fx, fac)
+            if pe is None or not plausible(a, pe): continue
+            ok = s + "|" + cur; break
+        if ok: symmap[t] = ok
+        else: tried[t] = NOW
+    jsave(os.path.join(DATA, "symbols.json"), symmap); jsave(os.path.join(DATA, "tried.json"), tried, True)
+    symmap.pop("_v", None)
+
+    # 2) prezzi
+    prev = jload(os.path.join(SITE, "prices.json"), None) or jload(os.path.join(ROOT, "prices.json"), {}) or {}
+    pq = prev.get("q", {}) if prev.get("v") == 2 else {}            # i prezzi della versione vecchia potevano avere valute sbagliate
+    sel = [t for t, s in symmap.items() if s and t in byT and (FULL or not byT[t][6] or byT[t][7] == 2)]
+    syms = [sym_cur(symmap[t])[0] for t in sel]
+    log("aggiorno", len(syms), "simboli")
+    q = fetch_last(syms)
+    n = 0
+    bad = 0
+    for t in sel:
+        s, cur = sym_cur(symmap[t])
+        if s not in q: continue
+        fac = FUT[t][1] if t in FUT else 1
+        p, pc = to_eur(q[s][0], cur, fx, fac), to_eur(q[s][1], cur, fx, fac)
+        if not p: continue
+        old = pq.get(t)
+        if old and not (0.5 < p / old[0] < 2) and byT[t][2] != "crypto":   # salto assurdo: probabile dato sbagliato di Yahoo
+            bad += 1; continue
+        pq[t] = [round(p, 6), round(pc, 6), int(NOW)]; n += 1
+    log("prezzi aggiornati", n, "· scartati per salto anomalo", bad)
+    out = {"v": 2, "ts": int(NOW), "fx": fx, "q": pq, "y": {t: sym_cur(s)[0] for t, s in symmap.items() if s and t != "_v"}}
+    os.makedirs(SITE, exist_ok=True)
+    jsave(os.path.join(SITE, "prices.json"), out, True)
+
+    # 3) calendario eventi (una volta al giorno, solo azioni principali)
+    ev = jload(os.path.join(DATA, "events.json"), {})
+    if EVENTS:
+        stocks = [t for t in symmap if symmap[t] and t in byT and byT[t][2] == "azioni" and not byT[t][6]]
+        log("eventi per", len(stocks), "azioni")
+        new = {}
+        for t in stocks:
+            try:
+                cal = yf.Ticker(sym_cur(symmap[t])[0]).calendar or {}
+                L = []
+                for k, typ in (("Earnings Date", "conti"), ("Ex-Dividend Date", "stacco"), ("Dividend Date", "pagamento")):
+                    v = cal.get(k)
+                    vs = v if isinstance(v, list) else [v]
+                    for d in vs:
+                        if d and hasattr(d, "isoformat"): L.append([typ, d.isoformat()[:10]])
+                if L: new[t] = L
+            except Exception:
+                pass
+            time.sleep(.2)
+        if new: ev = new
+        jsave(os.path.join(DATA, "events.json"), ev, True)
+    jsave(os.path.join(SITE, "events.json"), ev, True)
+
+    # tiene attivo il robot: GitHub sospende le esecuzioni programmate dopo 60 giorni senza modifiche
+    if dt.datetime.now(dt.timezone.utc).weekday() == 0 and HOUR == 4:
+        with open(os.path.join(DATA, "ultimo-controllo.txt"), "w") as f: f.write(dt.datetime.now(dt.timezone.utc).isoformat() + "\n")
+
+    # 4) avvisi di prezzo → notifiche ntfy (facoltativo)
+    try: alerts(out)
+    except Exception as e: log("avvisi: errore", e)
+
+def alerts(prices):
+    gid, tok = os.environ.get("GIST_ID", "").strip(), os.environ.get("GIST_TOKEN", "").strip()
+    if not gid or not tok: log("avvisi: Gist non configurato, salto"); return
+    H = {"Authorization": "token " + tok, "Accept": "application/vnd.github+json", "User-Agent": "impara-investire-robot"}
+    g = http_json("https://api.github.com/gists/" + gid, headers=H)
+    f = g["files"].get("impara-investire.json")
+    if not f: return
+    raw = f["content"] if not f.get("truncated") else urllib.request.urlopen(f["raw_url"]).read().decode()
+    S = json.loads(raw)
+    topic = (S.get("settings") or {}).get("ntfy", "")
+    al = S.get("alerts") or []
+    if not al or not topic: log("avvisi: nessun avviso o nessun canale ntfy"); return
+    q = prices["q"]
+    crypto = [a for a in al if a["t"] not in q]
+    cg = {}
+    if crypto:
+        try:
+            for row in http_json("https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&per_page=250&page=1", headers={"User-Agent": "Mozilla/5.0"}):
+                cg.setdefault(row["symbol"].upper(), row["current_price"])
+        except Exception as e: log("coingecko", e)
+    keep, fired = [], []
+    for a in al:
+        p = q[a["t"]][0] if a["t"] in q else cg.get(a["t"])
+        if p is None: keep.append(a); continue
+        hit = p <= a["lvl"] if a["dir"] == "below" else p >= a["lvl"]
+        if hit: fired.append((a, p))
+        else: keep.append(a)
+    if not fired: log("avvisi: nessuno scattato"); return
+    for a, p in fired:
+        verbo = "è sceso sotto" if a["dir"] == "below" else "è salito sopra"
+        msg = f"{a.get('n', a['t'])} {verbo} {a['lvl']:.2f} €: ora vale {p:.2f} €".replace(".", ",")
+        urllib.request.urlopen(urllib.request.Request("https://ntfy.sh/" + topic, data=msg.encode(), headers={"Title": "Impara a Investire", "Tags": "bell"}, method="POST"), timeout=20)
+        S.setdefault("notes", []).insert(0, {"ts": int(time.time() * 1000), "txt": "🔔 " + msg + " (notifica inviata sul telefono)", "read": False, "port": ""})
+        log("notifica:", msg)
+    S["alerts"] = keep
+    S["upd"] = int(time.time() * 1000)
+    body = json.dumps({"files": {"impara-investire.json": {"content": json.dumps(S, ensure_ascii=False)}}}).encode()
+    http_json("https://api.github.com/gists/" + gid, data=body, headers=dict(H, **{"Content-Type": "application/json"}), method="PATCH")
+
+if __name__ == "__main__":
+    main()
