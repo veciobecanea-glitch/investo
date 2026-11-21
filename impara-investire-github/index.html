@@ -335,6 +335,7 @@ body.dark .ptag.sim{background:#3A3428;color:#E2CF9F;border-color:#5A4F38}body.d
         <option value="risk-desc">Rischio: dal più alto</option>
       </select>
       <button class="btn ghost" id="fbtn" onclick="fOpen=!fOpen;renderFilters()">🎛️ Filtri</button>
+      <button class="btn ghost" id="realbtn" style="display:none" onclick="mF.real=!mF.real;mExp={};renderMarket();renderFilters()">✅ Solo prezzi veri</button>
     </div>
     <div class="card filters" id="filters" style="display:none"></div>
     <div class="chips" id="catchips"></div>
@@ -1819,7 +1820,7 @@ function renderMarket(){
   let list=ASSETS.filter(a=>{if(!(mCat==="tutti"||(mCat==="fav"?isFav(a.t):a.c===mCat)))return false;if(!passF(a))return false;const hw=a._hw||(a._hw=norm(a.n+" "+a.t+" "+a.s+" "+CATS[a.c].n).split(/[^a-z0-9&]+/));return words.every(w=>hw.some(x=>x.startsWith(w))||a.t.toLowerCase()===w)});
   const by={"nome":(a,b)=>a.n.localeCompare(b.n),"chg-desc":(a,b)=>chgToday(b)-chgToday(a),"chg-asc":(a,b)=>chgToday(a)-chgToday(b),"risk-asc":(a,b)=>a.r-b.r,"risk-desc":(a,b)=>b.r-a.r}[sort];
   if(sort.startsWith("chg")){const m=new Map(list.map(a=>[a,chgToday(a)]));list.sort(sort==="chg-desc"?(a,b)=>m.get(b)-m.get(a):(a,b)=>m.get(a)-m.get(b))}else list.sort(by);
-  if(!list.length){$("#market-sum").innerHTML="";$("#market-list").innerHTML=`<div class="empty">Nessun risultato${raw?` per «${esc(raw)}»`:""}${fActive()?" con questi filtri":""}. Prova con un altro nome, sigla o settore${fActive()?" oppure azzera i filtri":""}.</div>`;return}
+  if(!list.length){$("#market-sum").innerHTML="";$("#market-list").innerHTML=`<div class="empty">Nessun risultato${raw?` per «${esc(raw)}»`:""}${fActive()?" con questi filtri":""}. Prova con un altro nome, sigla o settore${fActive()?" oppure azzera i filtri":""}.${realOn()?` <br>Stai vedendo solo i titoli con prezzo vero: <button class="btn ghost sm" onclick="mF.real=false;renderMarket();renderFilters()">🎲 Mostra anche simulati</button>`:""}</div>`;return}
   const groups=Object.keys(CATS).map(k=>[k,list.filter(a=>a.c===k)]).filter(g=>g[1].length);
   $("#market-sum").innerHTML=`<span class="small muted">${raw?`Risultati per «${esc(raw)}»: `:""}<b>${list.length}</b> strumenti</span> `+groups.map(([k,g])=>`<a class="chip" href="#mercati" onclick="event.preventDefault();document.getElementById('grp-${k}').scrollIntoView({behavior:'smooth',block:'start'})">${CATS[k].n} <b>${g.length}</b></a>`).join("");
   const lim=(raw||mCat!=="tutti")?12:6;
@@ -2645,9 +2646,11 @@ function openCompare(){const as=S.compare.map(t=>AMAP[t]).filter(Boolean);if(as.
 const EU_C=/Germania|Francia|Spagna|Olanda|Paesi Bassi|Svizzera|Regno Unito|Svezia|Danimarca|Belgio|Irlanda|Portogallo|Austria|Finlandia|Norvegia|Europa/;
 function countryOf(a){if(a.c!=="azioni")return"";const s=a.s;if(/Italia/.test(s))return"Italia";if(/USA|Canada/.test(s)&&!/Regno Unito\/USA|Svezia\/USA/.test(s))return"USA";if(EU_C.test(s)||/Regno Unito|Svezia/.test(s))return"Europa";return"Asia e altri"}
 function sectorOf(a){if(a.c!=="azioni")return"";const k=secKey(a);return SEC[k]?SEC[k].n:a.s.split(" · ")[0]}
-let mF={country:"",sector:"",risk:5,div:0,ter:0},fOpen=false;
+let mF={country:"",sector:"",risk:5,div:0,ter:0,real:true},fOpen=false;
+function nReal(){let n=0;for(const t in RQ)if(AMAP[t]&&rq(AMAP[t]))n++;return n}
+function realOn(){return mF.real&&nReal()>=50}
 function fActive(){return (mF.country?1:0)+(mF.sector?1:0)+(mF.risk<5?1:0)+(mF.div>0?1:0)+(mF.ter>0?1:0)}
-function renderFilters(){const el=$("#filters");if(!el)return;$("#fbtn").innerHTML=`🎛️ Filtri${fActive()?` (${fActive()})`:""}`;$("#fbtn").classList.toggle("on",fOpen||fActive()>0);
+function renderFilters(){const el=$("#filters");if(!el)return;const rb=$("#realbtn");if(rb){const n=nReal();rb.style.display=n>=50?"":"none";rb.classList.toggle("on",mF.real);rb.innerHTML=mF.real?`✅ Solo prezzi veri (${n})`:`🎲 Mostra anche simulati`}$("#fbtn").innerHTML=`🎛️ Filtri${fActive()?` (${fActive()})`:""}`;$("#fbtn").classList.toggle("on",fOpen||fActive()>0);
   if(!fOpen){el.style.display="none";return}el.style.display="grid";
   const secs=[...new Set(ASSETS.map(sectorOf).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"it"));
   el.innerHTML=`<div><label class="small muted">Paese (azioni)</label><select class="sel" onchange="mF.country=this.value;mExp={};renderMarket();renderFilters()"><option value="">Tutti</option>${["USA","Europa","Italia","Asia e altri"].map(c=>`<option ${mF.country===c?"selected":""}>${c}</option>`).join("")}</select></div>
@@ -2655,8 +2658,8 @@ function renderFilters(){const el=$("#filters");if(!el)return;$("#fbtn").innerHT
   <div><label class="small muted">Rischio massimo: <b>${RISK_TXT[mF.risk]}</b></label><input type="range" min="1" max="5" value="${mF.risk}" oninput="mF.risk=+this.value;mExp={};renderMarket();renderFilters()"></div>
   <div><label class="small muted">Dividendo minimo</label><select class="sel" onchange="mF.div=+this.value;mExp={};renderMarket();renderFilters()">${[[0,"Qualsiasi"],[1,"Almeno 1%"],[2,"Almeno 2%"],[3,"Almeno 3%"],[4,"Almeno 4%"],[5,"Almeno 5%"]].map(([v,l])=>`<option value="${v}" ${mF.div===v?"selected":""}>${l}</option>`).join("")}</select></div>
   <div><label class="small muted">Costo massimo ETF (TER)</label><select class="sel" onchange="mF.ter=+this.value;mExp={};renderMarket();renderFilters()">${[[0,"Qualsiasi"],[.1,"Fino a 0,10%"],[.2,"Fino a 0,20%"],[.3,"Fino a 0,30%"],[.5,"Fino a 0,50%"]].map(([v,l])=>`<option value="${v}" ${mF.ter===v?"selected":""}>${l}</option>`).join("")}</select></div>
-  <div style="align-self:end"><button class="btn ghost" style="width:100%" onclick="mF={country:'',sector:'',risk:5,div:0,ter:0};mExp={};renderMarket();renderFilters()">Azzera filtri</button></div>`}
-function passF(a){if(mF.country&&countryOf(a)!==mF.country)return false;if(mF.sector&&sectorOf(a)!==mF.sector)return false;if(a.r>mF.risk)return false;
+  <div style="align-self:end"><button class="btn ghost" style="width:100%" onclick="mF={country:'',sector:'',risk:5,div:0,ter:0,real:mF.real};mExp={};renderMarket();renderFilters()">Azzera filtri</button></div>`}
+function passF(a){if(realOn()&&!rq(a))return false;if(mF.country&&countryOf(a)!==mF.country)return false;if(mF.sector&&sectorOf(a)!==mF.sector)return false;if(a.r>mF.risk)return false;
   if(mF.div>0&&divYield(a)<mF.div)return false;if(mF.ter>0&&(a.c!=="etf"||a.ter>mF.ter))return false;return true}
 
 /* =========================== PROFILO INVESTITORE =========================== */
@@ -2860,7 +2863,8 @@ setInterval(()=>{
     if($("#t-amt")&&$("#t-amt").value)updPreview();}
   processAll();checkAlerts();if(Date.now()-lastAlert>60000){lastAlert=Date.now();forEachPort(coachAlerts)}
   if(curView()==="portafoglio"&&!$("#ov").classList.contains("on"))renderPortfolio();else{const pv=pfValue();$("#cashpill").innerHTML=`<span class="lab">${esc(PF.name)}: </span><b class="${pv.total>=PF.start?"up":"down"}">${money(pv.total)}</b>`}
-},4000);
+  if(curAsset&&typeof rq==="function"&&$("#sh-ptag")&&rq(curAsset))$("#sh-ptag").outerHTML=priceTag(curAsset);
+},3000);
 
 async function jget(u,ms){const c=new AbortController();const tm=setTimeout(()=>c.abort(),ms||12000);try{const r=await fetch(u,{signal:c.signal,cache:"no-cache"});if(!r.ok)throw new Error(r.status);return await r.json()}finally{clearTimeout(tm)}}
 async function loadConfig(){try{const c=await jget("config.json",6000);if(c&&typeof c==="object"){["worker","geminiModel"].forEach(k=>{if(c[k]&&!JSON.parse(localStorage.getItem("ii-cfg")||"{}")[k])CFG[k]=c[k]})}NET_ON=true}catch(e){}}
@@ -2872,10 +2876,20 @@ let lastCG=0;
 async function loadCrypto(){if(Date.now()-lastCG<110000)return;lastCG=Date.now();
   try{const want={};ASSETS.forEach(a=>{if(a.c==="crypto"&&!a.etp)want[(CG_FIX[a.t]||a.t).toUpperCase()]=a.t});
     for(const pg of[1,2]){const L=await jget(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&order=market_cap_desc&per_page=250&page=${pg}`,15000);
-      for(const r of L){const t=want[(r.symbol||"").toUpperCase()];if(!t||RQ[t]&&RQ[t].src==="coingecko"&&RQ[t]._pg<pg)continue;const p=r.current_price,ch=r.price_change_percentage_24h;
+      for(const r of L){const t=want[(r.symbol||"").toUpperCase()];if(!t||RQ[t]&&RQ[t].src==="coingecko"&&RQ[t]._pg<pg)continue;if(RQ[t]&&RQ[t].src==="binance"&&Date.now()-RQ[t].ts<120000){delete want[(r.symbol||"").toUpperCase()];continue}const p=r.current_price,ch=r.price_change_percentage_24h;
         setRQ(t,p,ch!=null?p/(1+ch/100):p,Date.now(),"coingecko");RQ[t]._pg=pg;delete want[(r.symbol||"").toUpperCase()]}}
     NET_ON=true;saveRQ()}catch(e){}}
-function watchList(){const s=new Set();S.ports.forEach(P=>Object.keys(P.pos).forEach(t=>s.add(t)));S.fav.forEach(t=>s.add(t));S.alerts.forEach(x=>s.add(x.t));S.compare.forEach(t=>s.add(t));if(curAsset)s.add(curAsset.t);return [...s].filter(t=>AMAP[t])}
+/* --- crypto in tempo reale da Binance (flusso continuo, gratis) --- */
+let BWS=null,BWSmap=null,BWSeur=0,BWSlast=0;
+function binanceHandle(L){const now=Date.now();for(const x of L)if(x.s==="EURUSDT"&&+x.c>0)BWSeur=+x.c;const usd=BWSeur||FX.USD;if(!usd)return 0;let n=0;
+  for(const x of L){const t=BWSmap[x.s];if(!t)continue;const c=+x.c,o=+x.o;if(c>0){setRQ(t,c/usd,o>0?o/usd:c/usd,now,"binance");n++}}if(n)BWSlast=now;return n}
+function binanceStart(){if(BWS||document.hidden||!("WebSocket" in window)||(window.claude&&/claude|anthropic|usercontent/.test(location.hostname+document.referrer)))return;
+  if(!BWSmap){BWSmap={};ASSETS.forEach(a=>{if(a.c==="crypto"&&!a.etp){const s=(CG_FIX[a.t]||a.t).toUpperCase();if(s!=="USDT")BWSmap[s+"USDT"]=a.t}})}
+  try{BWS=new WebSocket("wss://stream.binance.com:9443/ws/!miniTicker@arr")}catch(e){BWS=null;return}
+  BWS.onmessage=ev=>{try{binanceHandle(JSON.parse(ev.data))}catch(e){}};
+  BWS.onclose=()=>{BWS=null;if(!document.hidden)setTimeout(binanceStart,15000)};BWS.onerror=()=>{try{BWS.close()}catch(e){}}}
+function binanceStop(){if(BWS){const w=BWS;BWS=null;w.onclose=null;try{w.close()}catch(e){}}}
+function watchList(){const s=new Set();document.querySelectorAll("[data-price]").forEach(el=>{if(s.size<160&&el.offsetParent!==null)s.add(el.dataset.price)});S.ports.forEach(P=>Object.keys(P.pos).forEach(t=>s.add(t)));S.fav.forEach(t=>s.add(t));S.alerts.forEach(x=>s.add(x.t));S.compare.forEach(t=>s.add(t));if(curAsset)s.add(curAsset.t);return [...s].filter(t=>AMAP[t])}
 async function loadLive(){if(!CFG.worker)return;const W=CFG.worker.replace(/\/+$/,"");const L=watchList();
   const isins=L.filter(t=>AMAP[t].isin),ys=L.filter(t=>!AMAP[t].isin&&YSYM[t]&&AMAP[t].c!=="crypto");
   try{for(let i=0;i<isins.length;i+=40){const j=await jget(W+"/tg?isin="+isins.slice(i,i+40).map(t=>AMAP[t].isin).join(","));for(const t of isins){const q=j[AMAP[t].isin];if(q)setRQ(t,q.p,q.pc,q.ts||Date.now(),"tradegate")}}
@@ -2886,10 +2900,10 @@ async function loadLive(){if(!CFG.worker)return;const W=CFG.worker.replace(/\/+$
 const FUTF={RAME:2204.62,GRANO:.01,MAIS:.01,SOIA:.01,CAFFE:.01,ZUCC:.01,COTONE:.01,SUCCO:.01,BESTIAME:.01,SUINI:.01,VITELLI:.01,AVENA:.01,OLIOSOIA:.01};
 async function netCycle(full){if(document.hidden)return;if(full){await loadPrices()}await loadCrypto();await loadLive();
   if(curAsset&&$("#sh-ptag"))$("#sh-ptag").outerHTML=priceTag(curAsset);}
-(async function netInit(){await loadConfig();await loadPrices();loadEvents();await loadCrypto();await loadLive();renderAll(true);
-  setInterval(()=>netCycle(false),60000);setInterval(()=>netCycle(true),15*60000);
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden){netCycle(true);syncPull()}})})();
-function srcName(s){return {tradegate:"Tradegate, in tempo reale",yahoo:"Yahoo Finance",robot:"aggiornamento automatico",coingecko:"CoinGecko, in tempo reale"}[s]||s}
+(async function netInit(){await loadConfig();await loadPrices();loadEvents();await loadCrypto();await loadLive();renderAll(true);try{renderFilters();renderMarket()}catch(e){}
+  binanceStart();setInterval(()=>netCycle(false),60000);setInterval(()=>netCycle(true),15*60000);setInterval(saveRQ,30000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){netCycle(true);syncPull();binanceStart()}else{binanceStop();saveRQ()}})})();
+function srcName(s){return {binance:"Binance, in tempo reale",tradegate:"Tradegate, in tempo reale",yahoo:"Yahoo Finance",robot:"aggiornamento automatico",coingecko:"CoinGecko, in tempo reale"}[s]||s}
 function priceTag(a){const r=rq(a);if(r){const old=Date.now()-r.ts>36e5*20;const tm=new Date(r.ts);const when=old?tm.toLocaleDateString("it-IT",{day:"2-digit",month:"short"})+" "+tm.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}):tm.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"});
     return `<span class="ptag live" id="sh-ptag" onclick="toast('Prezzo vero (${srcName(r.src)}) delle ${when}. Tra un aggiornamento e l\\'altro resta fermo.')">✅ Prezzo vero · ${when}</span>`}
   return `<span class="ptag sim" id="sh-ptag" onclick="toast('Prezzo simulato: si muove in modo realistico ma non è quello di Borsa di oggi.${NET_ON?" Per questo titolo non ho trovato un prezzo vero.":""}')">🎲 Simulato</span>`}
