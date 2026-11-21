@@ -47,7 +47,7 @@ jobs:
       - name: Scarica i prezzi
         env:
           FULL: ${{ (github.event_name == 'workflow_dispatch' && inputs.full) && '1' || '' }}
-          MAX_RESOLVE: "1500"
+          MAX_RESOLVE: "7000"
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: python robot/update.py
